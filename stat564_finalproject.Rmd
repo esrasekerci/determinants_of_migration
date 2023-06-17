@@ -1,0 +1,529 @@
+---
+title: "stat564_project"
+output: html_document
+date: "2023-05-16"
+---
+
+# Data instaling and feature engineering
+
+```{r, results='hide'}
+#install.packages("WDI")
+library(WDI)
+#install.packages("plm")
+library(plm)
+library(readr)
+library(tidyverse)
+library(dplyr)
+library(mice)
+library(DataExplorer) 
+library(tibble)
+library(VIM)
+library(ggplot2)
+library(plotly)
+#install.packages("devtools")
+library(devtools)
+#devtools::install_github("hrbrmstr/streamgraph")
+library(streamgraph)
+#install.packages("rgl")
+library(rgl)
+#install.packages("gganimate")
+library(gganimate)
+library(remotes)
+#install_github('vincentarelbundock/countrycode')
+library(countrycode)
+library(naniar)
+library(e1071)
+library(lme4)
+library(tidyr)
+```
+
+```{r}
+wdi<-WDI
+
+wdi<-WDI(country = c("USA","CHN","HKG","JPN","DEU",
+                     "IND","GBR","ARE","FRA","CAN",
+                     "RUS","ITA","IRN","BRA","PRK",
+                     "AUS","AUT","MEX","ESP","IDN",
+                     "SAU","TUR","TKM","NLD","CHE",
+                     "POL","ARG","SWE","BEL","THA",
+                     "ISR","IRL","NOR","NGA","EGY",
+                     "BGD","MYS","SGP","VNM","ZAF",
+                     "PHL","DNK","PAK","COL","CHL",
+                     "ROU","CZE","IRQ","FIN","PRT",
+                     "NZL","PER","KAZ","GRC","QAT",
+                     "UKR","DZA","HUN","KWT","MAR",
+                     "AGO","PRI","ECU","KEN","SVK",
+                     "SVN","DOM","ETH","OMN","CUB",
+                     "GTM","BGR","LUX","VEN","BLR",
+                     "UZB","TZA","GHA","COD","SRB",
+                     "MMR","UGA","JOR","TUN","CMR",
+                     "BHR","BOL","SDN","PRY","LBY",
+                     "LVA","EST","NPL","ZWE","SLV",
+                     "PNG","HND","TTO","KHM","ISL",
+                     "YEM","SEN","ZMB","CYP","GEO",
+                     "BIH","MAC","GAB","HTI","AFG",
+                     "GIN","BRN","MLI","BFA","ALB",
+                     "LBN","BWA","MOZ","ARM","BEN",
+                     "MLT","GNQ","LAO","JAM","KOR",
+                     "MNG","NIC","SYR","MDG","GUY",
+                     "LKA","URY","PAN","AZE","HRV",
+                     "CRI","LTU","NER","MKD","MDA",
+                     "TCD","BHS","NAM","RWA","MWI",
+                     "MUS","MRT","TJK","KGZ","NCL",
+                     "BLZ","BTN","BDI","CAF","COM",
+                     "CIV","DJI","SWZ","GMB",
+                     "LSO","LBR","MNE","SLE","SOM",
+                     "SSD","SUR","TGO"),
+         indicator = c("SM.POP.NETM", "PV.EST", "SL.UEM.TOTL.ZS", "SG.LAW.INDX", "FP.CPI.TOTL"),
+         start=2009,
+         end=2016,
+         extra=FALSE,
+         cache=NULL)
+
+#View(wdi)
+dim(wdi)
+```
+```{r}
+sapply(wdi, function(x) sum(is.na(x)))
+```
+
+```{r}
+## Checking the percentages of NA values
+(colMeans(is.na(wdi)))*100
+```
+
+```{r}
+(sum(is.na(wdi))/prod(dim(wdi)))*100
+```
+We have a total of 1,08 percent missing values in our data set. We will make imputation for the missing values by using the mice package.
+
+```{r}
+glimpse(wdi)
+```
+```{r}
+summary(wdi)
+```
+```{r}
+# Remove columns using select()
+wdi <- wdi %>% select(-c(iso2c, iso3c))
+```
+
+```{r}
+head(wdi)
+```
+
+```{r}
+arcp<- c(100,100,122.06,97.95,156.35,316.34,435.38,567.96)
+wdi[33:40,7]<-arcp
+```
+
+```{r}
+head(wdi)
+```
+
+```{r}
+happ <- read_csv("happiness-cantril-ladder.csv")
+```
+```{r}
+head(happ)
+```
+```{r}
+happ <- happ %>% select(c(Entity, Year, 'Cantril ladder score'))
+```
+
+```{r}
+colnames(happ)[1] <- "country"
+colnames(happ)[2] <- "year"
+```
+
+```{r}
+length(unique(wdi$country))
+```
+```{r}
+length(unique(happ$country))
+```
+```{r}
+unique(happ$country)
+```
+
+```{r}
+unique(wdi$country)
+```
+```{r}
+wdi[wdi$country == "Congo, Dem. Rep.", "country"] = "Democratic Republic of Congo"
+wdi[wdi$country == "Egypt, Arab Rep.", "country"] = "Egypt"
+wdi[wdi$country == "Gambia, The", "country"] = "Gambia"
+wdi[wdi$country == "Hong Kong SAR, China", "country"] = "Hong Kong"
+wdi[wdi$country == "Iran, Islamic Rep.", "country"] = "Iran"
+wdi[wdi$country == "Kyrgyz Republic", "country"] = "Kyrgyzstan"
+wdi[wdi$country == "Lao PDR", "country"] = "Laos"
+wdi[wdi$country == "Russian Federation", "country"] = "Russia"
+wdi[wdi$country == "Slovak Republic", "country"] = "Slovakia"
+wdi[wdi$country == "Syrian Arab Republic", "country"] = "Syria"
+wdi[wdi$country == "Turkiye", "country"] = "Turkey"
+wdi[wdi$country == "Venezuela, RB", "country"] = "Venezuela"
+wdi[wdi$country == "Yemen, Rep.", "country"] = "Yemen"
+```
+
+```{r}
+df <- merge(wdi, happ, by=c("country", "year"))
+```
+
+```{r}
+length(unique(df$country))
+```
+```{r}
+#df %>% filter_all(any_vars(. %in% c('Kosovo')))
+```
+
+```{r}
+dim(df)
+```
+```{r}
+(sum(is.na(df)/prod(dim(df)))*100)
+```
+```{r}
+head(df)
+```
+```{r}
+# assigning new names to the columns of the data frame
+colnames(df) <- c('country','year','migration', 'pol.stability', 'unemp', 'women.bl.scr', 'price.idx', 'happiness.scr')
+```
+
+```{r}
+glimpse(df)
+```
+```{r}
+str(df)
+```
+```{r}
+summary(df)
+```
+```{r}
+unique(df[c("country", "year")])
+```
+
+```{r}
+uni <- df %>%
+  group_by(country) %>%
+  summarise(n_unique = n_distinct(unlist(year))) %>%
+  ungroup()
+uni
+```
+```{r}
+sum(uni$n_unique < 4)
+```
+```{r}
+dplyr::filter(uni, n_unique < 4)
+```
+
+```{r}
+df %>% group_by(year) %>% summarize(count=n())
+```
+
+
+# adding rows for missing years
+
+```{r}
+library(tidyr)
+df <- df %>%
+    complete(country, year = 2009:2016, 
+             fill = list(incidents = 0)) %>%
+    as.data.frame()
+```
+
+# removing countries with less observation
+
+```{r}
+length(unique(df$country))
+```
+```{r}
+#remove <- c("Belize", "Bhutan", "Burundi", "Central African Republic", "Comoros", "Djibouti", "Eswatini", "Gambia", "Lesotho", "Namibia", "Oman", "Qatar", "Somalia", "Sudan", "Suriname", "Trinidad and Tobago")
+#df <- df[!grepl(paste(remove, collapse='|'), df$country),]
+```
+
+```{r}
+df<-df[-c(105:112,313:320,361:368,857:864,1057:1064,
+           121:128,177:184,401:408,209:216,249:256, 633:640,
+           785:792,921:928,1009:1016,1025:1032,1121:1128),]
+```
+
+```{r}
+dim(df)
+```
+```{r}
+length(unique(df$country))
+```
+```{r}
+df$continent <- countrycode(sourcevar = df[, "country"],
+                            origin = "country.name",
+                            destination = "continent")
+```
+
+```{r}
+(sum(is.na(df)/prod(dim(df)))*100)
+```
+```{r}
+dim(df) #141 countries remaining
+sum(is.na(df)) #437 NA
+(407) * 100 /(1120*9)
+```
+```{r}
+df %>% group_by(year) %>% summarize(count=n())
+```
+
+```{r}
+dim(df)
+```
+```{r}
+#write.csv(df,"C:/Users/ibrah/OneDrive/Masaüstü/df.csv", row.names = FALSE)
+```
+
+
+```{r}
+summary(df)
+```
+
+
+# Missing value imputation
+
+```{r}
+missplot<-ggplot(df,
+       aes(x = year,
+           y = migration)) +
+  geom_miss_point() + 
+  facet_wrap(~continent)
+missplot #for migration
+```
+
+```{r}
+df %>%
+  select(-c('year')) %>%
+  keep(is.numeric) %>% 
+  gather() %>%
+  ggplot(aes(value, colour = "orange")) +
+    facet_wrap(~ key, scales = "free") +
+    geom_density()   
+```
+
+```{r}
+df %>%
+  select(-c('year')) %>%
+  keep(is.numeric) %>% 
+  gather() %>% 
+  ggplot(aes(value)) +
+    facet_wrap(~ key, scales = "free") +
+    geom_histogram(color="darkblue", fill="lightblue",bins=70)
+```
+```{r}
+plot_missing(df)
+```
+```{r}
+aggr_plot <- aggr(df, col=c('navyblue','red'), numbers=TRUE, sortVars=TRUE, labels=names(df), cex.axis=.7, gap=3, ylab=c("Histogram of missing data","Pattern"))
+```
+```{r}
+init = mice(df, maxit=0) 
+init
+```
+```{r}
+meth = init$method # shows the method of imputation for each variable
+meth
+```
+```{r}
+predM = init$predictorMatrix
+predM
+```
+```{r}
+set.seed(12)
+imputed.wo.age = mice(df, method="cart", predictorMatrix=predM, m=5,  maxit = 0)
+```
+
+```{r}
+imputed <- complete(imputed.wo.age)
+```
+
+```{r}
+colSums(is.na(imputed))
+```
+```{r}
+df <- imputed
+```
+
+```{r}
+summary(df)
+```
+```{r}
+plot_str(df)
+```
+
+
+```{r}
+a<-df$migration
+skewness(a)
+```
+```{r}
+b<-df$pol.stability
+skewness(b)
+```
+```{r}
+c<-df$unemp
+skewness(c)
+```
+```{r}
+d<-df$women.bl.scr
+skewness(d)
+```
+```{r}
+e<-df$price.idx
+skewness(e)
+```
+```{r}
+f<-df$happiness.scr
+skewness(f)
+```
+
+# Exploratory data analysis
+
+
+```{r}
+dfx<-df[,3:8]
+dfy<- df[,3]
+cdf<-cor(dfx,method="spearman")
+library(corrplot)
+corrplot(cdf)
+a <- plot_correlation(cdf)
+a
+```
+
+```{r}
+df %>%
+  select(-c('year')) %>%
+  keep(is.numeric) %>% 
+  gather() %>%
+  ggplot(aes(value, colour = "purple")) +
+    facet_wrap(~ key, scales = "free") +
+    geom_density()   
+```
+
+```{r}
+df %>%
+  select(-c('year')) %>%
+  keep(is.numeric) %>% 
+  gather() %>% 
+  ggplot(aes(value)) +
+    facet_wrap(~ key, scales = "free") +
+    geom_histogram(color="red", fill="pink",bins=70)
+```
+
+```{r}
+set.seed(300)
+s = df[sample(1:nrow(df),200),]
+ggplot(s,aes(x=happiness.scr,y=women.bl.scr,size=price.idx,col=continent))+geom_point()+labs(title="-------")+ scale_color_brewer(palette="Paired")
+```
+
+```{r}
+p <- df %>%
+  filter(year==2015) %>%
+  ggplot(aes(happiness.scr, women.bl.scr, size = price.idx, color=continent)) +
+  geom_point() +
+  theme_bw()
+
+ggplotly(p)
+```
+
+
+```{r}
+ts<-dplyr::filter(df, country %in% c("Turkey", "Syria"))
+g7count<-dplyr::filter(df, country %in% c("Germany","Canada","Italy","France","United Kingdom","Japan","United States"))
+
+pp <- streamgraph(df, key="country", value="migration", date="year", interpolate="cardinal") %>%
+  sg_axis_x(1, "year", "%Y") %>%
+  sg_axis_y(10) %>%
+  sg_legend(show=TRUE, label="names: ")
+pp
+# save the widget
+# library(htmlwidgets)
+# saveWidget(pp, file=paste0( getwd(), "/HtmlWidget/streamgraphDropdown.html"))
+```
+
+```{r}
+p <- ggplot(
+  df, 
+  aes(x = migration, y=pol.stability, size = unemp, colour = continent)
+  ) +
+  geom_point(show.legend = FALSE, alpha = 0.7) +
+  scale_color_viridis_d() +
+  scale_size(range = c(2, 12)) +
+  scale_x_log10() +
+  labs(x = "migration", y = "political stability")
+p
+```
+```{r}
+gif <- p + transition_time(year) +
+  labs(title = "Year: {frame_time}")
+# show gif
+#gif
+```
+
+```{r}
+fig <- df %>%
+  plot_ly(
+    x = ~price.idx, 
+    y = ~happiness.scr, 
+    size = ~migration, 
+    color = ~continent, 
+    frame = ~year, 
+    text = ~country, 
+    hoverinfo = "text",
+    type = 'scatter',
+    mode = 'markers'
+  )
+fig <- fig %>% layout(
+    xaxis = list(
+      type = "log"
+    )
+  )
+
+fig
+```
+
+
+```{r}
+#htmlwidgets::saveWidget(
+#                widget = fig, #the plotly object
+#                file = "figure.html", #the path & file name
+#                selfcontained = TRUE #creates a single html file
+#              )
+```
+
+
+```{r}
+ts %>%
+  ggplot(aes(x = year, y = migration, colour = country)) +
+  geom_point() + 
+  geom_smooth()
+```
+
+```{r}
+ggplot(ts, aes(x = year, y = migration, colour = country)) +
+  geom_line() +
+    geom_point(size = 2)
+```
+```{r}
+#view(ts[c(1:3)])
+```
+
+
+```{r}
+ggplot(df, aes(x = year, y = migration, group = country, color = continent)) +
+  geom_line() +
+  labs(x = "Year", y = "Net Migration") +
+  scale_color_discrete(name = "Continent") +
+  theme_minimal()
+```
+
+
+
+
+
+
